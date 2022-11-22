@@ -19,6 +19,7 @@ app.use(cookieParser());
 
 //세션
 const session = require('express-session');
+//세션 미들웨어
 app.use(session({
     secret :'1111',
     resave : false,  //다시 저장안함
@@ -310,9 +311,19 @@ app.get('/signup', function (req , res) {
 
 })
 
+//회원가입
 app.post('/signup', function (req , res) {
-    
-    res.render('signup.ejs', {});
+
+
+    db.collection('login').insertOne({id: req.body.id, pw :req.body.pw, mobile: req.body.mobile, country: req.body.country}, function (err, result){
+        
+        if(err) return console.log(err);
+        console.log(result);
+        res.redirect('/login');
+    })
 
 })
+
+
+
 
