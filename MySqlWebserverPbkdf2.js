@@ -152,31 +152,33 @@ app.post('/login', function (req , res) {
     let sql = "select * from login";
     conn.query(sql, function (err,rows,fields) { 
         if(err){
-            console.log(err);
+            console.log(rows.length);
         }
         
+        console.log(rows);
+        console.log(rows.length);
         //console.log(rows);
         for(let i=0; i<rows.length; i++){
+
+            console.log(rows.length);
             if(rows[i].userid == userId){
-                
-                console.log('db비번:' + sha256(rows[i].userpw + salt));
-                console.log('입력비번:'+ sha256(userPw + salt));
+        
+                return hasher({password: userPw, salt: rows[i].mobile}, function(err,pass,salt,hash){
+                    console.log('pass:'+ pass);
+                    console.log('salt:'+ salt);
+                    console.log('hash:' + hash);
 
-                if(sha256(rows[i].userpw + salt) == sha256(userPw + salt)){
-                    
-                    console.log('로그인 되었습니다.');
-                    req.session.userid = userId;
-                    return res.redirect('/');
-                }
-                else{
-                    console.log('비밀번호가 틀렸습니다.');
-                    res.send('비밀번호가 틀렸습니다.');
-
-                }
+                    if (hash === rows[i].userpw) {
+                        req.session.userid = userId;
+                        res.redirect('/');
+                    }
+                    else{
+                        res.send('비밀번호가 틀렸습니다.');
+                    }
+                })
+            
             }
-            // else {
-            //     res.send('아이디가 틀렸습니다.');      
-            // }
+
         }
     })
 })

@@ -1,6 +1,9 @@
 const express = require('express');
 const app = express();
 
+
+require('dotenv').config();
+
 //app.use : 미들웨어
 const bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({extended : true}));
@@ -17,6 +20,10 @@ const cookieParser = require ('cookie-parser');
 app.use(cookieParser());
 
 
+//passport
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+
 //세션
 const session = require('express-session');
 //세션 미들웨어
@@ -27,6 +34,10 @@ app.use(session({
 }));
 
 
+//passport 미들웨어
+app.use(passport.initialize());
+app.use(passport.session());
+
 //list.html > list.ejs
 app.set('view engine', 'ejs');  
 
@@ -36,7 +47,7 @@ const mogoClient = require('mongodb').MongoClient;
 
 var db; 
 
-mogoClient.connect('mongodb+srv://canyi:piaoxin123@cluster0.uli6ovl.mongodb.net/?retryWrites=true&w=majority',function(err,client){
+mogoClient.connect(process.env.DB_URL,function(err,client){
     if(err){
         return console.log(err)
     }
@@ -67,9 +78,9 @@ mogoClient.connect('mongodb+srv://canyi:piaoxin123@cluster0.uli6ovl.mongodb.net/
 //라우터 get.post
 
 
-app.listen(8080, function() {
+app.listen(process.env.PORT, function() {
     
-    console.log('listening on 8080');
+    console.log('listen on' + process.env.PORT);
 
 });
 
@@ -272,34 +283,91 @@ app.get('/login', function (req , res) {
 
 })
 
-//로드인 post 처리
-app.post('/login', function (req , res) {
+//로그인 post 처리
+// app.post('/login', function (req , res) {
     
-    let userId = req.body.id;
-    let userPw = req.body.pw;
+//     let userId = req.body.id;
+//     let userPw = req.body.pw;
 
-    console.log(userId);
-    console.log(userPw);
+//     console.log(userId);
+//     console.log(userPw);
 
-    db.collection('login').findOne({id : userId}, function(err, result){
+//     db.collection('login').findOne({id : userId}, function(err, result){
         
-        if(err) return console.log(err);
+//         if(err) return console.log(err);
+//         if(!result){
+//             res.send("존재하지 않는 아이디입니다.");
+//             // res.redirect('/login');
+//         }
+//         else{
+
+//             console.log(result);
+//             if (result.pw == userPw) {
+//                 res.send("로그인 되었습니다.");
+//                 res.redirect('/');
+//             }
+//             else{
+//                 res.redirect('/login');
+//             }
+//         }
+//     })
+// })
+
+//로그인 passport 인증
+app.post('/login', passport.authenticate('local',{
+            
+            failureRedirect : '/fail'
+
+        }), function (req , res) {
+    
+        res.redirect('/');
+})
+
+passport.use(new LocalStrategy({
+    
+    usernameField : 'id',
+    passwordField : 'pw',
+    session : true,
+    passReqToCallback : false,
+}, function(inputid, inputpw, done){
+    console.log(inputid);
+    console.log(inputpw);
+    
+    db.collection('login').findOne({id :inputid}, function (err,result,res){
+
+        if(err) return done(err); //done : 
         if(!result){
-            res.send("존재하지 않는 아이디입니다.");
-            // res.redirect('/login');
+            return done(null, false, {message : '존재하지 않는 아이디입니다.'});  //null: server error code
+        }
+        if(result.pw == inputpw){
+            return done(null, result);        //result는 passport.serializeUser의 user로 넘어간다.
         }
         else{
-
-            console.log(result);
-            if (result.pw == userPw) {
-                res.send("로그인 되었습니다.");
-                res.redirect('/');
-            }
-            else{
-                res.redirect('/login');
-            }
+            return done(null, false, {message : '비번이 틀렸습니다.'});
         }
+        
     })
+}))
+
+//쿠키에 세션 등록
+passport.serializeUser(function(user, done){
+    done(null,user.id);
+})
+
+//세션데이터를 가진 사람을 db에서 찾기
+passport.deserializeUser(function (userid, done){
+    db.collection('login').findOne({id: userid}, function(err, result){
+        
+        done(null,result);
+        console.log(result);
+    })
+    
+});
+
+app.get('/fail', function (req , res) {
+    
+    res.send('로그인해주세요');
+
 })
 
 
@@ -326,4 +394,29 @@ app.post('/signup', function (req , res) {
 
 
 
+//마이페이지
+app.get('/mypage', isLogin,function (req , res) {
+    
+    res.render('mypage.ejs',{사용자: req.user});
 
+})
+
+//login 할경우 mypage보이기 설정
+function isLogin(req, res, next ) {
+    if(req.user){
+        next();
+    }
+    else{
+        res.send('로그인 해주세요');
+    }
+}
+
+
+
+//검색기능
+app.get('/qtest',function (req , res) {
+    
+    res.send(req.query.id+ ',' + req.query.pw);
+    // res.send(req.query.id);    
+
+})
