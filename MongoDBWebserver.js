@@ -38,6 +38,11 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+//글로벌 라우터 미들웨어 설정
+app.use('/webtoon', require('./routes/webtoon.js'));
+app.use('/shop', require('./routes/shop.js'));
+app.use('/', require('./routes/list.js'));
+
 //list.html > list.ejs
 app.set('view engine', 'ejs');  
 
@@ -66,10 +71,10 @@ mogoClient.connect(process.env.DB_URL,function(err,client){
 // });
 
 
-// app.listen(8080, function() {
+// // app.listen(8080, function() {
 
-// console.log('listening on 8080');
-// });
+// // console.log('listening on 8080');
+// // });
 });
 
 
@@ -85,18 +90,6 @@ app.listen(process.env.PORT, function() {
 });
 
 
-app.get('/game', function (req , res) {
-    
-    res.send('게임을 서비스해주는 페이지입니다.');
-
-})
-
-
-app.get('/webtoon', function (req , res) {
-    
-    res.send('웹툰을 볼수 있는 페이지입니다.');
-
-})
 
 // app.get('/', function (req , res) {
     
@@ -114,72 +107,30 @@ app.get('/webtoon', function (req , res) {
 
 
 
-//add 경로 post 요청 (write.html)
-app.post('/add',(req, res) => {
-    //console.log(req);
-    // console.log(req.body.title);
-    // console.log(req.body.date);
+// app.delete('/delete', function (req , res) {
     
-    db.collection('counter').findOne({name: 'postcnt'}, function(err,result){
-        if (err) {
-            console.log(err);
-        }
-        if(result){
-            console.log(result);
-        }
-        //Unique id 생성
-        //console.log(result.totalPost);
-        var totalCount = result.totalPost;
-
-        //res.send('홈입니다.');
-
-        db.collection('post').insert({_id: totalCount+1 ,todo:req.body.title, date:req.body.date});
-        console.log("전송완료");
-        // res.send("전송완료");
-
-        //res.sendFile(__dirname + '/list.html');
-        //Operator: 
-        //set(변경), 
-        //inc(증가), 
-        //min (기존값보다 적을때만 변경), 
-        //rename (key의 이름 변경))
-        db.collection('counter').updateOne({name: 'postcnt'}, {$inc : {totalPost : 1}}, function(err,result){
-            if (err) {
-                return console.log(err);
-            }
-
-        });
-    });   
-
-    //입력완료한 다음 홈으로 이동
-    res.redirect("/");
+//     console.log(req.body);
+//     req.body._id = parseInt(req.body._id);
+//     db.collection('post').deleteOne(req.body, function(err,result){
+//         if(err) return console.log(err);
+//         console.log('삭제완료');
+//         res.status(200).send({message:'성공했습니다.'});
+//     });
     
-});
-
-app.delete('/delete', function (req , res) {
-    
-    console.log(req.body);
-    req.body._id = parseInt(req.body._id);
-    db.collection('post').deleteOne(req.body, function(err,result){
-        if(err) return console.log(err);
-        console.log('삭제완료');
-        res.status(200).send({message:'성공했습니다.'});
-    });
-    
-})
+// })
 
 //ejs
 
-app.get('/list', function (req , res) {
+// app.get('/list', function (req , res) {
     
-    //DB에 있는 POST collection 가져오기
-    //find() 함수는 collection으로 가져온 함수를 string로 가져옴 
-    db.collection('post').find().toArray(function(err,result){
-            console.log(result);
-            res.render('list.ejs', {posts : result});
-    });
+//     //DB에 있는 POST collection 가져오기
+//     //find() 함수는 collection으로 가져온 함수를 string로 가져옴 
+//     db.collection('post').find().toArray(function(err,result){
+//             console.log(result);
+//             res.render('list.ejs', {posts : result});
+//     });
     
-})
+// })
 
 app.get('/write', function (req , res) {
     
@@ -196,6 +147,7 @@ app.get('/', function (req , res) {
 })
 
 
+//시맨틱 url
 app.get('/detail/:id', (req , res) => {
     console.log('상세페이지:',req.params.id);
     db.collection('post').findOne({_id: parseInt(req.params.id)}, function (err, result){
@@ -419,4 +371,125 @@ app.get('/qtest',function (req , res) {
     res.send(req.query.id+ ',' + req.query.pw);
     // res.send(req.query.id);    
 
+})
+
+
+//검색 
+
+app.get('/search',(req , res) => {
+    
+    //console.log(req.query);       //배열
+    console.log(req.query.value);   //검색어만
+
+    //일반적인 순차검색
+    // db.collection('post').find({todo : req.query.value}).toArray((err, result)=>{
+    //     console.log(result);
+    //     res.render('search.ejs', {posts : result});
+    // })
+
+    //바이너리 검색 / 부분검색 포함
+    db.collection('post').find({$text : {$search: req.query.value}}).toArray((err, result)=>{
+        console.log(result);
+        res.render('search.ejs', {posts : result});
+    })
+})
+
+
+//add 경로 post 요청 (write.html)
+app.post('/add',(req, res) => {
+    //console.log(req);
+    // console.log(req.body.title);
+    // console.log(req.body.date);
+    
+    db.collection('counter').findOne({name: 'postcnt'}, function(err,result){
+        if (err) {
+            console.log(err);
+        }
+        if(result){
+            console.log(result);
+        }
+        //Unique id 생성
+        //console.log(result.totalPost);
+        var totalCount = result.totalPost;
+
+        //res.send('홈입니다.');
+
+        db.collection('post').insert({_id: totalCount+1 ,writer: req.user._id, todo:req.body.title, date:req.body.date});
+        console.log("전송완료");
+        // res.send("전송완료");
+
+        //res.sendFile(__dirname + '/list.html');
+        //Operator: 
+        //set(변경), 
+        //inc(증가), 
+        //min (기존값보다 적을때만 변경), 
+        //rename (key의 이름 변경))
+        db.collection('counter').updateOne({name: 'postcnt'}, {$inc : {totalPost : 1}}, function(err,result){
+            if (err) {
+                return console.log(err);
+            }
+
+        });
+    });   
+
+    //입력완료한 다음 홈으로 이동
+    res.redirect("/");
+    
+});
+
+
+app.delete('/delete', function (req , res) {
+    
+    //console.log('req.body' + req.body);
+    req.body._id = parseInt(req.body._id);
+
+    var deleteData = {_id : req.body._id , writer : req.user._id };
+
+
+    // db.collection('post').deleteOne(req.body, function(err,result){
+    //     if(err) return console.log(err);
+    //     console.log('삭제완료');
+    //     res.status(200).send({message:'성공했습니다.'});
+    // });
+
+    db.collection('post').deleteOne(deleteData, function(err,result){
+        if(err) return console.log(err);
+        console.log('삭제완료');
+        console.log(result.deleteCount);
+        res.status(200).send({message:'성공했습니다.'});
+    });
+
+    
+})
+
+//multer 설정
+let multer = require('multer');
+let storage = multer.diskStorage({
+    destination : function (req, res, cb){
+        cb(null, './public/image');
+    },
+    filename: function(req,file,cb){
+        cb(null, file.originalname);
+    } 
+})
+
+let upload = multer({storage : storage})
+
+
+app.get('/upload', function (req, res) {
+    
+    res.render('upload.ejs');
+})
+
+
+app.post('/upload', upload.single('profile'),function (req, res) {
+    
+    res.send('업로드완료');
+})
+
+
+//이미지 가져오기
+app.get('/image/:imgname', function (req, res) {
+    
+    res.sendFile(__dirname + '/public/image/' + req.params.imgname);
 })
